@@ -2505,6 +2505,7 @@
     "请求失败": "Yêu cầu thất bại",
     "请求失败，请重试": "Yêu cầu thất bại, vui lòng thử lại",
     "请求头": "Tiêu đề yêu cầu",
+    "响应头": "Tiêu đề phản hồi",
     "请求头覆盖": "Ghi đè tiêu đề yêu cầu",
     "请求并计费模型": "Mô hình yêu cầu và tính phí",
     "请求成功": "Yêu cầu thành công",
