@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
@@ -20,6 +21,11 @@ const (
 // 如果未验证或验证已过期，返回 401 错误
 func SecureVerificationRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if operation_setting.SelfUseModeEnabled {
+			c.Next()
+			return
+		}
+
 		// 检查用户是否已登录
 		userId := c.GetInt("id")
 		if userId == 0 {
