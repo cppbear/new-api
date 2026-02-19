@@ -250,6 +250,8 @@ func InitLogDB() (err error) {
 func migrateDB() error {
 	// Migrate price_amount column from float/double to decimal for existing tables
 	migrateSubscriptionPlanPriceAmount()
+	// Migrate log_details text columns to MEDIUMTEXT for MySQL (supports up to 16MB vs 64KB for TEXT)
+	migrateLogDetailColumnTypes()
 
 	err := DB.AutoMigrate(
 		&Channel{},
@@ -503,6 +505,47 @@ func migrateSubscriptionPlanPriceAmount() {
 			common.SysLog(fmt.Sprintf("Warning: failed to migrate %s.%s to decimal: %v", tableName, columnName, err))
 		} else {
 			common.SysLog(fmt.Sprintf("Successfully migrated %s.%s to decimal(10,6)", tableName, columnName))
+		}
+	}
+}
+
+// migrateLogDetailColumnTypes migrates log_details content columns from TEXT to MEDIUMTEXT on MySQL.
+// MySQL TEXT has a ~64KB limit which is insufficient for the 1MB capture size.
+// PostgreSQL and SQLite TEXT types have no practical size limit, so no migration is needed.
+func migrateLogDetailColumnTypes() {
+	if !common.UsingMySQL {
+		return
+	}
+
+	tableName := "log_details"
+	if !DB.Migrator().HasTable(tableName) {
+		return
+	}
+
+	columns := []string{
+		"downstream_request",
+		"upstream_request",
+		"upstream_response",
+		"downstream_response",
+		"downstream_request_header",
+		"upstream_request_header",
+		"upstream_response_header",
+		"downstream_response_header",
+	}
+
+	for _, col := range columns {
+		var columnType string
+		DB.Raw(`SELECT COLUMN_TYPE FROM information_schema.columns
+			WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
+			tableName, col).Scan(&columnType)
+		if strings.EqualFold(columnType, "mediumtext") {
+			continue
+		}
+		alterSQL := fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN %s MEDIUMTEXT", tableName, col)
+		if err := DB.Exec(alterSQL).Error; err != nil {
+			common.SysLog(fmt.Sprintf("Warning: failed to migrate %s.%s to MEDIUMTEXT: %v", tableName, col, err))
+		} else {
+			common.SysLog(fmt.Sprintf("Successfully migrated %s.%s to MEDIUMTEXT", tableName, col))
 		}
 	}
 }

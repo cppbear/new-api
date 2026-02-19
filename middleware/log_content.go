@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const maxLogCaptureSize = 64 * 1024 // 64KB
+const maxLogCaptureSize = 1024 * 1024 // 1MB
 
 // logContentResponseWriter wraps gin.ResponseWriter to capture response bytes.
 type logContentResponseWriter struct {

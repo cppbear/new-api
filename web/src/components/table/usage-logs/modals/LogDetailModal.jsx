@@ -12,6 +12,7 @@ import {
   Collapsible,
   Typography,
   CodeHighlight,
+  Banner,
 } from '@douyinfe/semi-ui';
 import { IconCopy, IconChevronDown, IconChevronRight } from '@douyinfe/semi-icons';
 import 'prismjs/components/prism-json';
@@ -429,12 +430,12 @@ const TabContent = ({ content, header, headerLabel, defaultMerged, defaultFormat
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(content || '');
+      await navigator.clipboard.writeText(displayContent || '');
       Toast.success(t('复制成功'));
     } catch {
       Toast.error(t('复制失败'));
     }
-  }, [content, t]);
+  }, [displayContent, t]);
 
   const handleMergedView = useCallback(() => {
     if (mergedView) {
@@ -458,10 +459,18 @@ const TabContent = ({ content, header, headerLabel, defaultMerged, defaultFormat
   }
 
   const isSSE = content.includes('data: {');
+  const isTruncated = content.length >= 1024 * 1024;
 
   return (
     <div>
       <HeaderSection header={header} label={headerLabel} t={t} />
+      {isTruncated && (
+        <Banner
+          type='warning'
+          description={t('内容可能已被截断，实际内容超过1MB限制')}
+          style={{ marginBottom: 8 }}
+        />
+      )}
       <div
         style={{
           display: 'flex',

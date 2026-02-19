@@ -306,7 +306,7 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	var reqCaptureBuf *bytes.Buffer
 	if common2.LogContentEnabled {
 		reqCaptureBuf = bytes.NewBuffer(make([]byte, 0, 4096))
-		requestBody = io.TeeReader(requestBody, &logLimitedWriter{w: reqCaptureBuf, remaining: 64 * 1024})
+		requestBody = io.TeeReader(requestBody, &logLimitedWriter{w: reqCaptureBuf, remaining: 1024 * 1024})
 	}
 
 	fullRequestURL, err := a.GetRequestURL(info)

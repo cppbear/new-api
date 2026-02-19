@@ -711,6 +711,7 @@
     "复制成功": "Copied",
     "复制失败": "Copy failed",
     "非有效JSON": "Invalid JSON",
+    "内容可能已被截断，实际内容超过1MB限制": "Content may have been truncated, actual content exceeds the 1MB limit",
     "暂无数据": "No data",
     "加载中...": "Loading...",
     "加载失败": "Load failed",
