@@ -105,6 +105,45 @@ export const useLogsData = () => {
     logType: '0',
   };
 
+  // Log detail modal state (admin only)
+  const [showLogDetail, setShowLogDetail] = useState(false);
+  const [logDetailId, setLogDetailId] = useState(null);
+
+  const openLogDetailModal = (logId) => {
+    setLogDetailId(logId);
+    setShowLogDetail(true);
+  };
+
+  const closeLogDetailModal = () => {
+    setShowLogDetail(false);
+    setLogDetailId(null);
+  };
+
+  // Load saved column preferences from localStorage
+  useEffect(() => {
+    const savedColumns = localStorage.getItem(STORAGE_KEY);
+    if (savedColumns) {
+      try {
+        const parsed = JSON.parse(savedColumns);
+        const defaults = getDefaultColumnVisibility();
+        const merged = { ...defaults, ...parsed };
+
+        // For non-admin users, force-hide admin-only columns (does not touch admin settings)
+        if (!isAdminUser) {
+          merged[COLUMN_KEYS.CHANNEL] = false;
+          merged[COLUMN_KEYS.USERNAME] = false;
+          merged[COLUMN_KEYS.RETRY] = false;
+        }
+        setVisibleColumns(merged);
+      } catch (e) {
+        console.error('Failed to parse saved column preferences', e);
+        initDefaultColumns();
+      }
+    } else {
+      initDefaultColumns();
+    }
+  }, []);
+
   // Get default column visibility based on user role
   const getDefaultColumnVisibility = () => {
     return {
@@ -811,6 +850,12 @@ export const useLogsData = () => {
     setShowChannelAffinityUsageCacheModal,
     channelAffinityUsageCacheTarget,
     openChannelAffinityUsageCacheModal,
+
+    // Log detail modal
+    showLogDetail,
+    logDetailId,
+    openLogDetailModal,
+    closeLogDetailModal,
 
     // Functions
     loadLogs,
