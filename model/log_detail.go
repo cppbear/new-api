@@ -8,7 +8,7 @@ import (
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
 
-const maxLogContentSize = 64 * 1024 // 64KB
+const maxLogContentSize = 1024 * 1024 // 1MB
 
 type LogDetail struct {
 	Id                       int    `json:"id" gorm:"primaryKey;autoIncrement"`
