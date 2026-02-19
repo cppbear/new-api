@@ -235,6 +235,9 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 			Closer: originalBody,
 		}
 	}
+	if common.LogContentEnabled && httpResp != nil {
+		c.Set("log_upstream_response_header", httpResp.Header.Clone())
+	}
 
 	usage, newApiErr := adaptor.DoResponse(c, httpResp, info)
 

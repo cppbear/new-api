@@ -703,6 +703,7 @@
     "上游请求": "Upstream Request",
     "上游响应": "Upstream Response",
     "下游响应": "Downstream Response",
+    "请求头": "Headers",
     "格式化": "Format",
     "原始数据": "Raw Data",
     "整合视图": "Merged View",
