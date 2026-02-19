@@ -696,7 +696,7 @@
     "启用请求透传": "Enable request pass-through",
     "启用额度消费日志记录": "Enable quota consumption logging",
     "启用请求/响应内容日志": "Enable request/response content logging",
-    "开启后将记录请求和响应的完整内容，仅管理员可查看，每条记录最大64KB": "When enabled, full request and response content will be logged. Only admins can view. Max 64KB per field.",
+    "开启后将记录请求和响应的完整内容，仅管理员可查看，每条记录最大1MB": "When enabled, full request and response content will be logged. Only admins can view. Max 1MB per field.",
     "查看请求/响应详情": "View Request/Response Details",
     "请求/响应详情": "Request/Response Details",
     "下游请求": "Downstream Request",

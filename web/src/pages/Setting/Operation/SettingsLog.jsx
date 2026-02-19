@@ -236,7 +236,7 @@ export default function SettingsLog(props) {
                   size='small'
                   style={{ display: 'block', marginTop: 4 }}
                 >
-                  {t('开启后将记录请求和响应的完整内容，仅管理员可查看，每条记录最大64KB')}
+                  {t('开启后将记录请求和响应的完整内容，仅管理员可查看，每条记录最大1MB')}
                 </Text>
               </Col>
               <Col xs={24} sm={12} md={8} lg={8} xl={8}>
