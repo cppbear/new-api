@@ -169,3 +169,27 @@ func DeleteHistoryLogs(c *gin.Context) {
 	})
 	return
 }
+
+func GetLogDetail(c *gin.Context) {
+	logId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "invalid log id",
+		})
+		return
+	}
+	detail, err := model.GetLogDetailByLogId(logId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "log detail not found",
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    detail,
+	})
+}

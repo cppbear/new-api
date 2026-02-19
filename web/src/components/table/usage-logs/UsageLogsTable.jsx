@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useMemo } from 'react';
-import { Empty, Descriptions } from '@douyinfe/semi-ui';
+import { Empty, Descriptions, Button } from '@douyinfe/semi-ui';
 import CardTable from '../../common/ui/CardTable';
 import {
   IllustrationNoResult,
@@ -44,6 +44,7 @@ const LogsTable = (logsData) => {
     hasExpandableRows,
     isAdminUser,
     billingDisplayMode,
+    openLogDetailModal,
     t,
     COLUMN_KEYS,
   } = logsData;
@@ -85,7 +86,24 @@ const LogsTable = (logsData) => {
   }, [compactMode, visibleColumnsList]);
 
   const expandRowRender = (record, index) => {
-    return <Descriptions data={expandData[record.key]} />;
+    return (
+      <div>
+        <Descriptions data={expandData[record.key]} />
+        {isAdminUser && (
+          <Button
+            size='small'
+            theme='light'
+            style={{ marginTop: 8 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              openLogDetailModal(record.key);
+            }}
+          >
+            {t('查看请求/响应详情')}
+          </Button>
+        )}
+      </div>
+    );
   };
 
   return (
