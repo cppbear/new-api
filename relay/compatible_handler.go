@@ -109,6 +109,17 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 				println("requestBody: ", string(debugBytes))
 			}
 		}
+		// Capture upstream request for log content
+		if common.LogContentEnabled {
+			if upBytes, bErr := storage.Bytes(); bErr == nil {
+				if len(upBytes) > 64*1024 {
+					c.Set("log_upstream_request", string(upBytes[:64*1024]))
+				} else {
+					c.Set("log_upstream_request", string(upBytes))
+				}
+			}
+			storage.Seek(0, 0)
+		}
 		requestBody = common.ReaderOnly(storage)
 	} else {
 		convertedRequest, err := adaptor.ConvertOpenAIRequest(c, info, request)
@@ -180,6 +191,15 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 
 		logger.LogDebug(c, fmt.Sprintf("text request body: %s", string(jsonData)))
 
+		// Capture upstream request for log content
+		if common.LogContentEnabled {
+			if len(jsonData) > 64*1024 {
+				c.Set("log_upstream_request", string(jsonData[:64*1024]))
+			} else {
+				c.Set("log_upstream_request", string(jsonData))
+			}
+		}
+
 		requestBody = bytes.NewBuffer(jsonData)
 	}
 
@@ -202,7 +222,26 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 		}
 	}
 
+	// Capture upstream response body via TeeReader
+	var upstreamRespBuf *bytes.Buffer
+	if common.LogContentEnabled && httpResp != nil && httpResp.Body != nil {
+		upstreamRespBuf = bytes.NewBuffer(make([]byte, 0, 4096))
+		originalBody := httpResp.Body
+		httpResp.Body = struct {
+			io.Reader
+			io.Closer
+		}{
+			Reader: io.TeeReader(originalBody, &limitedWriter{w: upstreamRespBuf, remaining: 64 * 1024}),
+			Closer: originalBody,
+		}
+	}
+
 	usage, newApiErr := adaptor.DoResponse(c, httpResp, info)
+
+	// Store captured upstream response in context
+	if upstreamRespBuf != nil {
+		c.Set("log_upstream_response", upstreamRespBuf.String())
+	}
 	if newApiErr != nil {
 		// reset status code 重置状态码
 		service.ResetStatusCode(newApiErr, statusCodeMappingStr)
@@ -504,4 +543,24 @@ func postConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 		Group:            relayInfo.UsingGroup,
 		Other:            other,
 	})
+}
+
+// limitedWriter writes up to `remaining` bytes to the underlying writer, then silently discards.
+type limitedWriter struct {
+	w         io.Writer
+	remaining int
+}
+
+func (lw *limitedWriter) Write(p []byte) (n int, err error) {
+	if lw.remaining <= 0 {
+		return len(p), nil // discard
+	}
+	if len(p) > lw.remaining {
+		n, err = lw.w.Write(p[:lw.remaining])
+		lw.remaining = 0
+		return len(p), err
+	}
+	n, err = lw.w.Write(p)
+	lw.remaining -= n
+	return len(p), err
 }

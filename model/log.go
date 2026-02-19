@@ -130,6 +130,8 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	err := LOG_DB.Create(log).Error
 	if err != nil {
 		logger.LogError(c, "failed to record log: "+err.Error())
+	} else {
+		c.Set("log_record_id", log.Id)
 	}
 }
 
@@ -191,6 +193,8 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	err := LOG_DB.Create(log).Error
 	if err != nil {
 		logger.LogError(c, "failed to record log: "+err.Error())
+	} else {
+		c.Set("log_record_id", log.Id)
 	}
 	if common.DataExportEnabled {
 		gopool.Go(func() {
@@ -458,6 +462,21 @@ func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelNa
 
 func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64, error) {
 	var total int64 = 0
+
+	// Delete associated log_details first
+	for {
+		if nil != ctx.Err() {
+			return total, ctx.Err()
+		}
+		affected, err := DeleteLogDetailsByTimestamp(targetTimestamp, limit)
+		if err != nil {
+			common.SysLog("failed to delete old log details: " + err.Error())
+			break
+		}
+		if affected < int64(limit) {
+			break
+		}
+	}
 
 	for {
 		if nil != ctx.Err() {

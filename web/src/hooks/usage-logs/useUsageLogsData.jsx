@@ -121,6 +121,20 @@ export const useLogsData = () => {
   const [channelAffinityUsageCacheTarget, setChannelAffinityUsageCacheTarget] =
     useState(null);
 
+  // Log detail modal state (admin only)
+  const [showLogDetail, setShowLogDetail] = useState(false);
+  const [logDetailId, setLogDetailId] = useState(null);
+
+  const openLogDetailModal = (logId) => {
+    setLogDetailId(logId);
+    setShowLogDetail(true);
+  };
+
+  const closeLogDetailModal = () => {
+    setShowLogDetail(false);
+    setLogDetailId(null);
+  };
+
   // Load saved column preferences from localStorage
   useEffect(() => {
     const savedColumns = localStorage.getItem(STORAGE_KEY);
@@ -784,6 +798,12 @@ export const useLogsData = () => {
     setShowChannelAffinityUsageCacheModal,
     channelAffinityUsageCacheTarget,
     openChannelAffinityUsageCacheModal,
+
+    // Log detail modal
+    showLogDetail,
+    logDetailId,
+    openLogDetailModal,
+    closeLogDetailModal,
 
     // Functions
     loadLogs,
