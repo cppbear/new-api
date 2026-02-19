@@ -11,8 +11,10 @@ import {
   Empty,
   Collapsible,
   Typography,
+  CodeHighlight,
 } from '@douyinfe/semi-ui';
 import { IconCopy, IconChevronDown, IconChevronRight } from '@douyinfe/semi-icons';
+import 'prismjs/components/prism-json';
 import { useTranslation } from 'react-i18next';
 import { API } from '../../../../helpers';
 
@@ -346,7 +348,7 @@ const headerPreStyle = {
   maxHeight: '30vh',
 };
 
-const HeaderSection = ({ header, t }) => {
+const HeaderSection = ({ header, label, t }) => {
   const [open, setOpen] = useState(false);
 
   if (!header) return null;
@@ -365,16 +367,22 @@ const HeaderSection = ({ header, t }) => {
         onClick={() => setOpen(!open)}
       >
         {open ? <IconChevronDown size='small' /> : <IconChevronRight size='small' />}
-        <Typography.Text strong size='small'>{t('请求头')}</Typography.Text>
+        <Typography.Text strong size='small'>{label || t('请求头')}</Typography.Text>
       </div>
       <Collapsible isOpen={open} keepDOM>
-        <pre style={headerPreStyle}>{formatted}</pre>
+        <div style={headerPreStyle} className='log-detail-code-highlight'>
+          <CodeHighlight
+            code={formatted}
+            language='json'
+            lineNumber={false}
+          />
+        </div>
       </Collapsible>
     </div>
   );
 };
 
-const TabContent = ({ content, header, defaultMerged, defaultFormatted, t }) => {
+const TabContent = ({ content, header, headerLabel, defaultMerged, defaultFormatted, t }) => {
   const [formatted, setFormatted] = useState(false);
   const [displayContent, setDisplayContent] = useState('');
   const [mergedView, setMergedView] = useState(false);
@@ -453,7 +461,7 @@ const TabContent = ({ content, header, defaultMerged, defaultFormatted, t }) => 
 
   return (
     <div>
-      <HeaderSection header={header} t={t} />
+      <HeaderSection header={header} label={headerLabel} t={t} />
       <div
         style={{
           display: 'flex',
@@ -474,7 +482,17 @@ const TabContent = ({ content, header, defaultMerged, defaultFormatted, t }) => 
           {t('复制')}
         </Button>
       </div>
-      <pre style={preStyle}>{displayContent}</pre>
+      {(formatted || mergedView) ? (
+        <div style={preStyle} className='log-detail-code-highlight'>
+          <CodeHighlight
+            code={displayContent}
+            language='json'
+            lineNumber={false}
+          />
+        </div>
+      ) : (
+        <pre style={preStyle}>{displayContent}</pre>
+      )}
     </div>
   );
 };
@@ -539,10 +557,10 @@ const LogDetailModal = ({
             <TabContent content={detail.upstream_request} header={detail.upstream_request_header} defaultFormatted t={t} />
           </TabPane>
           <TabPane tab={t('上游响应')} itemKey='upstream_response'>
-            <TabContent content={detail.upstream_response} header={detail.upstream_response_header} defaultMerged t={t} />
+            <TabContent content={detail.upstream_response} header={detail.upstream_response_header} headerLabel={t('响应头')} defaultMerged t={t} />
           </TabPane>
           <TabPane tab={t('下游响应')} itemKey='downstream_response'>
-            <TabContent content={detail.downstream_response} header={detail.downstream_response_header} defaultMerged t={t} />
+            <TabContent content={detail.downstream_response} header={detail.downstream_response_header} headerLabel={t('响应头')} defaultMerged t={t} />
           </TabPane>
         </Tabs>
       ) : (
