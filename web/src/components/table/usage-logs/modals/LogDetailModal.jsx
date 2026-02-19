@@ -30,7 +30,52 @@ const preStyle = {
   lineHeight: 1.6,
 };
 
-const buildMergedContent = (content) => {
+const detectSSEFormat = (content) => {
+  const lines = (content || '').split('\n');
+  const eventLines = lines.filter((l) => l.startsWith('event: '));
+  const dataLines = lines.filter(
+    (l) => l.startsWith('data: ') && l !== 'data: [DONE]',
+  );
+
+  if (dataLines.length === 0) return null;
+
+  // Check Anthropic format via event names
+  if (
+    eventLines.some(
+      (l) =>
+        l.includes('message_start') || l.includes('content_block_delta'),
+    )
+  ) {
+    return 'anthropic';
+  }
+
+  // Check OpenAI Responses format via event names
+  if (eventLines.some((l) => /^event: response\./.test(l))) {
+    return 'responses';
+  }
+
+  // Parse first few data lines to detect format
+  for (const line of dataLines.slice(0, 5)) {
+    try {
+      const obj = JSON.parse(line.slice(6));
+      if (obj.candidates) return 'gemini';
+      if (obj.choices && obj.choices[0]?.delta !== undefined) return 'openai';
+      if (
+        obj.type === 'message_start' ||
+        obj.type === 'content_block_start'
+      )
+        return 'anthropic';
+      if (typeof obj.type === 'string' && obj.type.startsWith('response.'))
+        return 'responses';
+    } catch {
+      // skip
+    }
+  }
+
+  return 'openai'; // default fallback
+};
+
+const buildMergedContentOpenAI = (content) => {
   const lines = (content || '').split('\n');
   const chunks = [];
   for (const line of lines) {
@@ -89,6 +134,211 @@ const buildMergedContent = (content) => {
   if (last.usage) merged.usage = last.usage;
 
   return JSON.stringify(merged, null, 2);
+};
+
+const buildMergedContentAnthropic = (content) => {
+  const lines = (content || '').split('\n');
+  let currentEvent = '';
+  const events = [];
+
+  for (const line of lines) {
+    if (line.startsWith('event: ')) {
+      currentEvent = line.slice(7).trim();
+    } else if (line.startsWith('data: ')) {
+      try {
+        events.push({ event: currentEvent, data: JSON.parse(line.slice(6)) });
+      } catch {
+        // skip
+      }
+    }
+  }
+
+  if (events.length === 0) return null;
+
+  let message = null;
+  const contentBlocks = [];
+  let currentBlock = null;
+  let stopReason = null;
+  let outputUsage = {};
+
+  for (const { data } of events) {
+    if (data.type === 'message_start' && data.message) {
+      message = { ...data.message };
+    } else if (data.type === 'content_block_start') {
+      currentBlock = { ...data.content_block, _text: '', _input_json: '' };
+    } else if (data.type === 'content_block_delta' && currentBlock) {
+      if (data.delta?.type === 'text_delta') {
+        currentBlock._text += data.delta.text || '';
+      } else if (data.delta?.type === 'thinking_delta') {
+        currentBlock._text += data.delta.thinking || '';
+      } else if (data.delta?.type === 'input_json_delta') {
+        currentBlock._input_json += data.delta.partial_json || '';
+      }
+    } else if (data.type === 'content_block_stop') {
+      if (currentBlock) {
+        contentBlocks.push(currentBlock);
+        currentBlock = null;
+      }
+    } else if (data.type === 'message_delta') {
+      if (data.delta?.stop_reason) stopReason = data.delta.stop_reason;
+      if (data.usage) outputUsage = data.usage;
+    }
+  }
+
+  if (!message) return null;
+
+  const mergedContent = contentBlocks.map((block) => {
+    if (block.type === 'thinking') {
+      return { type: 'thinking', thinking: block._text };
+    } else if (block.type === 'tool_use') {
+      let input = {};
+      try {
+        input = JSON.parse(block._input_json || '{}');
+      } catch {
+        // skip
+      }
+      return { type: 'tool_use', id: block.id, name: block.name, input };
+    }
+    return { type: 'text', text: block._text };
+  });
+
+  const merged = {
+    id: message.id,
+    type: 'message',
+    role: message.role || 'assistant',
+    model: message.model,
+    content: mergedContent,
+    stop_reason: stopReason || message.stop_reason,
+    usage: { ...(message.usage || {}), ...outputUsage },
+  };
+
+  return JSON.stringify(merged, null, 2);
+};
+
+const buildMergedContentGemini = (content) => {
+  const lines = (content || '').split('\n');
+  const chunks = [];
+  for (const line of lines) {
+    if (line.startsWith('data: ')) {
+      try {
+        chunks.push(JSON.parse(line.slice(6)));
+      } catch {
+        // skip
+      }
+    }
+  }
+  if (chunks.length === 0) return null;
+
+  const textParts = [];
+  const thoughtParts = [];
+  let model = '';
+  let usageMetadata = null;
+
+  for (const chunk of chunks) {
+    if (chunk.modelVersion && !model) model = chunk.modelVersion;
+    if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
+    for (const candidate of chunk.candidates || []) {
+      for (const part of candidate?.content?.parts || []) {
+        if (part.thought && part.text) {
+          thoughtParts.push(part.text);
+        } else if (part.text) {
+          textParts.push(part.text);
+        }
+      }
+    }
+  }
+
+  const parts = [];
+  if (thoughtParts.length > 0) {
+    parts.push({ thought: true, text: thoughtParts.join('') });
+  }
+  if (textParts.length > 0) {
+    parts.push({ text: textParts.join('') });
+  }
+
+  const merged = {
+    candidates: [{ content: { parts, role: 'model' } }],
+  };
+  if (model) merged.modelVersion = model;
+  if (usageMetadata) merged.usageMetadata = usageMetadata;
+
+  return JSON.stringify(merged, null, 2);
+};
+
+const buildMergedContentResponses = (content) => {
+  const lines = (content || '').split('\n');
+  let currentEvent = '';
+  const events = [];
+
+  for (const line of lines) {
+    if (line.startsWith('event: ')) {
+      currentEvent = line.slice(7).trim();
+    } else if (line.startsWith('data: ')) {
+      try {
+        events.push({ event: currentEvent, data: JSON.parse(line.slice(6)) });
+      } catch {
+        // skip
+      }
+    }
+  }
+
+  if (events.length === 0) return null;
+
+  // If response.completed exists, use its full response object
+  const completedEvent = events.find(
+    (e) => e.event === 'response.completed',
+  );
+  if (completedEvent?.data?.response) {
+    return JSON.stringify(completedEvent.data.response, null, 2);
+  }
+
+  // Fallback: accumulate text from deltas
+  const textParts = [];
+  let responseObj = null;
+
+  for (const { event, data } of events) {
+    if (event === 'response.created' && data) {
+      responseObj = data;
+    }
+    if (event === 'response.output_text.delta' && data?.delta) {
+      textParts.push(data.delta);
+    }
+  }
+
+  if (responseObj && textParts.length > 0) {
+    const result = { ...responseObj };
+    if (Array.isArray(result.output)) {
+      for (const item of result.output) {
+        if (item.type === 'message' && Array.isArray(item.content)) {
+          for (const c of item.content) {
+            if (c.type === 'output_text') {
+              c.text = textParts.join('');
+            }
+          }
+        }
+      }
+    }
+    return JSON.stringify(result, null, 2);
+  }
+
+  return responseObj ? JSON.stringify(responseObj, null, 2) : null;
+};
+
+const buildMergedContent = (content) => {
+  const format = detectSSEFormat(content);
+  if (!format) return null;
+
+  switch (format) {
+    case 'anthropic':
+      return buildMergedContentAnthropic(content);
+    case 'gemini':
+      return buildMergedContentGemini(content);
+    case 'responses':
+      return buildMergedContentResponses(content);
+    case 'openai':
+    default:
+      return buildMergedContentOpenAI(content);
+  }
 };
 
 const headerPreStyle = {

@@ -1,6 +1,7 @@
 package channel
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -280,7 +281,34 @@ func applyHeaderOverrideToRequest(req *http.Request, headerOverride map[string]s
 	}
 }
 
+// logLimitedWriter writes up to `remaining` bytes to the underlying writer, then silently discards.
+type logLimitedWriter struct {
+	w         io.Writer
+	remaining int
+}
+
+func (lw *logLimitedWriter) Write(p []byte) (n int, err error) {
+	if lw.remaining <= 0 {
+		return len(p), nil // discard
+	}
+	if len(p) > lw.remaining {
+		n, err = lw.w.Write(p[:lw.remaining])
+		lw.remaining = 0
+		return len(p), err
+	}
+	n, err = lw.w.Write(p)
+	lw.remaining -= n
+	return len(p), err
+}
+
 func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody io.Reader) (*http.Response, error) {
+	// Capture upstream request body
+	var reqCaptureBuf *bytes.Buffer
+	if common2.LogContentEnabled {
+		reqCaptureBuf = bytes.NewBuffer(make([]byte, 0, 4096))
+		requestBody = io.TeeReader(requestBody, &logLimitedWriter{w: reqCaptureBuf, remaining: 64 * 1024})
+	}
+
 	fullRequestURL, err := a.GetRequestURL(info)
 	if err != nil {
 		return nil, fmt.Errorf("get request url failed: %w", err)
@@ -308,9 +336,36 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		c.Set("log_upstream_request_header", req.Header.Clone())
 	}
 	resp, err := doRequest(c, req, info)
+
+	// Store captured upstream request body
+	if reqCaptureBuf != nil && reqCaptureBuf.Len() > 0 {
+		c.Set("log_upstream_request", reqCaptureBuf.String())
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)
 	}
+
+	// Capture upstream response body: wrap resp.Body with TeeReader
+	if common2.LogContentEnabled && resp != nil && resp.Body != nil {
+		respCaptureBuf := bytes.NewBuffer(make([]byte, 0, 4096))
+		originalBody := resp.Body
+		resp.Body = struct {
+			io.Reader
+			io.Closer
+		}{
+			Reader: io.TeeReader(originalBody, &logLimitedWriter{w: respCaptureBuf, remaining: 64 * 1024}),
+			Closer: originalBody,
+		}
+		// Store buffer reference; LogContentCapture middleware reads it after request completes
+		c.Set("_log_upstream_response_buf", respCaptureBuf)
+	}
+
+	// Capture upstream response header
+	if common2.LogContentEnabled && resp != nil {
+		c.Set("log_upstream_response_header", resp.Header.Clone())
+	}
+
 	return resp, nil
 }
 

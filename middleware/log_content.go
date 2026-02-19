@@ -84,10 +84,21 @@ func LogContentCapture() gin.HandlerFunc {
 		}
 
 		upstreamReq, _ := c.Get("log_upstream_request")
-		upstreamResp, _ := c.Get("log_upstream_response")
-
 		upstreamReqStr, _ := upstreamReq.(string)
-		upstreamRespStr, _ := upstreamResp.(string)
+
+		// Read upstream response: prefer buffer reference (set by DoApiRequest), fall back to string
+		var upstreamRespStr string
+		if upBuf, ok := c.Get("_log_upstream_response_buf"); ok {
+			if b, ok := upBuf.(*bytes.Buffer); ok && b.Len() > 0 {
+				upstreamRespStr = b.String()
+			}
+		}
+		if upstreamRespStr == "" {
+			if resp, ok := c.Get("log_upstream_response"); ok {
+				upstreamRespStr, _ = resp.(string)
+			}
+		}
+
 		downstreamRespStr := buf.String()
 
 		// Serialize headers
