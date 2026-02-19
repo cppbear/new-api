@@ -566,10 +566,10 @@ const LogDetailModal = ({
             <TabContent content={detail.upstream_request} header={detail.upstream_request_header} defaultFormatted t={t} />
           </TabPane>
           <TabPane tab={t('上游响应')} itemKey='upstream_response'>
-            <TabContent content={detail.upstream_response} header={detail.upstream_response_header} headerLabel={t('响应头')} defaultMerged t={t} />
+            <TabContent content={detail.upstream_response} header={detail.upstream_response_header} headerLabel={t('响应头')} defaultMerged defaultFormatted t={t} />
           </TabPane>
           <TabPane tab={t('下游响应')} itemKey='downstream_response'>
-            <TabContent content={detail.downstream_response} header={detail.downstream_response_header} headerLabel={t('响应头')} defaultMerged t={t} />
+            <TabContent content={detail.downstream_response} header={detail.downstream_response_header} headerLabel={t('响应头')} defaultMerged defaultFormatted t={t} />
           </TabPane>
         </Tabs>
       ) : (
