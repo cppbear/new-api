@@ -9,8 +9,10 @@ import {
   Tag,
   Space,
   Empty,
+  Collapsible,
+  Typography,
 } from '@douyinfe/semi-ui';
-import { IconCopy } from '@douyinfe/semi-icons';
+import { IconCopy, IconChevronDown, IconChevronRight } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { API } from '../../../../helpers';
 
@@ -89,7 +91,40 @@ const buildMergedContent = (content) => {
   return JSON.stringify(merged, null, 2);
 };
 
-const TabContent = ({ content, defaultMerged, t }) => {
+const headerPreStyle = {
+  ...preStyle,
+  maxHeight: '30vh',
+};
+
+const HeaderSection = ({ header, t }) => {
+  const [open, setOpen] = useState(false);
+
+  if (!header) return null;
+
+  let formatted = header;
+  try {
+    formatted = JSON.stringify(JSON.parse(header), null, 2);
+  } catch {
+    // use raw string
+  }
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div
+        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}
+        onClick={() => setOpen(!open)}
+      >
+        {open ? <IconChevronDown size='small' /> : <IconChevronRight size='small' />}
+        <Typography.Text strong size='small'>{t('请求头')}</Typography.Text>
+      </div>
+      <Collapsible isOpen={open} keepDOM>
+        <pre style={headerPreStyle}>{formatted}</pre>
+      </Collapsible>
+    </div>
+  );
+};
+
+const TabContent = ({ content, header, defaultMerged, t }) => {
   const [formatted, setFormatted] = useState(false);
   const [displayContent, setDisplayContent] = useState('');
   const [mergedView, setMergedView] = useState(false);
@@ -158,6 +193,7 @@ const TabContent = ({ content, defaultMerged, t }) => {
 
   return (
     <div>
+      <HeaderSection header={header} t={t} />
       <div
         style={{
           display: 'flex',
@@ -237,16 +273,16 @@ const LogDetailModal = ({
       ) : detail ? (
         <Tabs>
           <TabPane tab={t('下游请求')} itemKey='downstream_request'>
-            <TabContent content={detail.downstream_request} t={t} />
+            <TabContent content={detail.downstream_request} header={detail.downstream_request_header} t={t} />
           </TabPane>
           <TabPane tab={t('上游请求')} itemKey='upstream_request'>
-            <TabContent content={detail.upstream_request} t={t} />
+            <TabContent content={detail.upstream_request} header={detail.upstream_request_header} t={t} />
           </TabPane>
           <TabPane tab={t('上游响应')} itemKey='upstream_response'>
-            <TabContent content={detail.upstream_response} defaultMerged t={t} />
+            <TabContent content={detail.upstream_response} header={detail.upstream_response_header} defaultMerged t={t} />
           </TabPane>
           <TabPane tab={t('下游响应')} itemKey='downstream_response'>
-            <TabContent content={detail.downstream_response} defaultMerged t={t} />
+            <TabContent content={detail.downstream_response} header={detail.downstream_response_header} defaultMerged t={t} />
           </TabPane>
         </Tabs>
       ) : (

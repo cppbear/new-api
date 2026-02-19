@@ -3,6 +3,7 @@ package middleware
 import (
 	"bytes"
 	"io"
+	"net/http"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -55,6 +56,9 @@ func LogContentCapture() gin.HandlerFunc {
 			storage.Seek(0, io.SeekStart)
 		}
 
+		// 1b. Capture downstream request header
+		downstreamReqHeader := c.Request.Header.Clone()
+
 		// 2. Wrap response writer to capture downstream response
 		buf := &bytes.Buffer{}
 		writer := &logContentResponseWriter{
@@ -66,7 +70,10 @@ func LogContentCapture() gin.HandlerFunc {
 		// 3. Process request
 		c.Next()
 
-		// 4. Collect data and create LogDetail asynchronously
+		// 4. Capture downstream response header
+		downstreamRespHeader := c.Writer.Header().Clone()
+
+		// 5. Collect data and create LogDetail asynchronously
 		logId, exists := c.Get("log_record_id")
 		if !exists {
 			return
@@ -83,13 +90,33 @@ func LogContentCapture() gin.HandlerFunc {
 		upstreamRespStr, _ := upstreamResp.(string)
 		downstreamRespStr := buf.String()
 
+		// Serialize headers
+		downstreamReqHeaderStr := model.HeadersToJSON(downstreamReqHeader)
+		downstreamRespHeaderStr := model.HeadersToJSON(downstreamRespHeader)
+
+		var upstreamReqHeaderStr, upstreamRespHeaderStr string
+		if h, ok := c.Get("log_upstream_request_header"); ok {
+			if header, ok := h.(http.Header); ok {
+				upstreamReqHeaderStr = model.HeadersToJSON(header)
+			}
+		}
+		if h, ok := c.Get("log_upstream_response_header"); ok {
+			if header, ok := h.(http.Header); ok {
+				upstreamRespHeaderStr = model.HeadersToJSON(header)
+			}
+		}
+
 		gopool.Go(func() {
 			detail := &model.LogDetail{
-				LogId:              logIdInt,
-				DownstreamRequest:  downstreamReq,
-				UpstreamRequest:    upstreamReqStr,
-				UpstreamResponse:   upstreamRespStr,
-				DownstreamResponse: downstreamRespStr,
+				LogId:                    logIdInt,
+				DownstreamRequest:        downstreamReq,
+				UpstreamRequest:          upstreamReqStr,
+				UpstreamResponse:         upstreamRespStr,
+				DownstreamResponse:       downstreamRespStr,
+				DownstreamRequestHeader:  downstreamReqHeaderStr,
+				UpstreamRequestHeader:    upstreamReqHeaderStr,
+				UpstreamResponseHeader:   upstreamRespHeaderStr,
+				DownstreamResponseHeader: downstreamRespHeaderStr,
 			}
 			if err := model.CreateLogDetail(detail); err != nil {
 				common.SysLog("failed to create log detail: " + err.Error())
