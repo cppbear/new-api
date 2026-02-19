@@ -374,7 +374,7 @@ const HeaderSection = ({ header, t }) => {
   );
 };
 
-const TabContent = ({ content, header, defaultMerged, t }) => {
+const TabContent = ({ content, header, defaultMerged, defaultFormatted, t }) => {
   const [formatted, setFormatted] = useState(false);
   const [displayContent, setDisplayContent] = useState('');
   const [mergedView, setMergedView] = useState(false);
@@ -391,8 +391,18 @@ const TabContent = ({ content, header, defaultMerged, t }) => {
       }
     }
     setMergedView(false);
+    if (defaultFormatted && content) {
+      try {
+        const parsed = JSON.parse(content);
+        setDisplayContent(JSON.stringify(parsed, null, 2));
+        setFormatted(true);
+        return;
+      } catch {
+        // not JSON, fall through to raw display
+      }
+    }
     setDisplayContent(content || '');
-  }, [content, defaultMerged]);
+  }, [content, defaultMerged, defaultFormatted]);
 
   const handleFormat = useCallback(() => {
     if (formatted) {
@@ -523,10 +533,10 @@ const LogDetailModal = ({
       ) : detail ? (
         <Tabs>
           <TabPane tab={t('下游请求')} itemKey='downstream_request'>
-            <TabContent content={detail.downstream_request} header={detail.downstream_request_header} t={t} />
+            <TabContent content={detail.downstream_request} header={detail.downstream_request_header} defaultFormatted t={t} />
           </TabPane>
           <TabPane tab={t('上游请求')} itemKey='upstream_request'>
-            <TabContent content={detail.upstream_request} header={detail.upstream_request_header} t={t} />
+            <TabContent content={detail.upstream_request} header={detail.upstream_request_header} defaultFormatted t={t} />
           </TabPane>
           <TabPane tab={t('上游响应')} itemKey='upstream_response'>
             <TabContent content={detail.upstream_response} header={detail.upstream_response_header} defaultMerged t={t} />
