@@ -361,6 +361,16 @@ const HeaderSection = ({ header, label, t }) => {
     // use raw string
   }
 
+  const handleCopyHeader = async (e) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(formatted);
+      Toast.success(t('复制成功'));
+    } catch {
+      Toast.error(t('复制失败'));
+    }
+  };
+
   return (
     <div style={{ marginBottom: 12 }}>
       <div
@@ -369,6 +379,13 @@ const HeaderSection = ({ header, label, t }) => {
       >
         {open ? <IconChevronDown size='small' /> : <IconChevronRight size='small' />}
         <Typography.Text strong size='small'>{label || t('请求头')}</Typography.Text>
+        <Button
+          size='small'
+          theme='borderless'
+          icon={<IconCopy size='small' />}
+          onClick={handleCopyHeader}
+          style={{ marginLeft: 4, padding: '0 4px', height: 20 }}
+        />
       </div>
       <Collapsible isOpen={open} keepDOM>
         <div style={headerPreStyle} className='log-detail-code-highlight'>
