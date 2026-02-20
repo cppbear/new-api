@@ -354,7 +354,7 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 			io.Reader
 			io.Closer
 		}{
-			Reader: io.TeeReader(originalBody, &logLimitedWriter{w: respCaptureBuf, remaining: 64 * 1024}),
+			Reader: io.TeeReader(originalBody, &logLimitedWriter{w: respCaptureBuf, remaining: 1024 * 1024}),
 			Closer: originalBody,
 		}
 		// Store buffer reference; LogContentCapture middleware reads it after request completes
