@@ -3,6 +3,7 @@ package model
 import (
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
@@ -28,7 +29,16 @@ func truncateString(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
-	return s[:maxLen]
+	// Back up to a valid UTF-8 boundary
+	truncated := s[:maxLen]
+	for len(truncated) > 0 && !utf8.RuneStart(truncated[len(truncated)-1]) {
+		truncated = truncated[:len(truncated)-1]
+	}
+	// Drop the incomplete leading byte if present
+	if len(truncated) > 0 && truncated[len(truncated)-1] >= 0xC0 {
+		truncated = truncated[:len(truncated)-1]
+	}
+	return truncated
 }
 
 var sensitiveHeaderKeys = map[string]bool{
@@ -66,7 +76,16 @@ func HeadersToJSON(h http.Header) string {
 		return ""
 	}
 	sanitized := sanitizeHeaders(h)
-	data, err := common.Marshal(sanitized)
+	// Flatten single-value headers to plain strings
+	flat := make(map[string]interface{}, len(sanitized))
+	for k, vals := range sanitized {
+		if len(vals) == 1 {
+			flat[k] = vals[0]
+		} else {
+			flat[k] = vals
+		}
+	}
+	data, err := common.Marshal(flat)
 	if err != nil {
 		return ""
 	}
@@ -74,6 +93,11 @@ func HeadersToJSON(h http.Header) string {
 }
 
 func CreateLogDetail(detail *LogDetail) error {
+	// Sanitize non-UTF-8 bytes before truncation to prevent DB insert failures
+	detail.DownstreamRequest = strings.ToValidUTF8(detail.DownstreamRequest, "\uFFFD")
+	detail.UpstreamRequest = strings.ToValidUTF8(detail.UpstreamRequest, "\uFFFD")
+	detail.UpstreamResponse = strings.ToValidUTF8(detail.UpstreamResponse, "\uFFFD")
+	detail.DownstreamResponse = strings.ToValidUTF8(detail.DownstreamResponse, "\uFFFD")
 	detail.DownstreamRequest = truncateString(detail.DownstreamRequest, maxLogContentSize)
 	detail.UpstreamRequest = truncateString(detail.UpstreamRequest, maxLogContentSize)
 	detail.UpstreamResponse = truncateString(detail.UpstreamResponse, maxLogContentSize)
